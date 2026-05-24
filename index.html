@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Your Seat</title>
+    <style>
+        :root {
+            --primary-color: #8a7355; 
+            --bg-color: #faf8f5;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            border: 1px solid #eae1d4;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 5px;
+            color: var(--primary-color);
+            font-weight: normal;
+        }
+
+        .subtitle {
+            font-style: italic;
+            color: #777;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 25px;
+            box-sizing: border-box;
+            outline: none;
+            font-family: inherit;
+            transition: border 0.3s;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-family: inherit;
+            width: 100%;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #715e45;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .success {
+            background-color: #f4f0ea;
+            border: 1px solid #e1d5c5;
+        }
+
+        .error {
+            background-color: #fdf2f2;
+            border: 1px solid #f8b4b4;
+            color: #9b1c1c;
+        }
+
+        .table-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Welcome</h1>
+    <div class="subtitle" id="statusMessage">Loading guest list...</div>
+    
+    <input type="text" id="guestName" placeholder="e.g., Jane Doe" autocomplete="off" disabled>
+    <button id="searchBtn" onclick="findSeat()" disabled>Find My Seat</button>
+
+    <div id="resultBox" class="result"></div>
+</div>
+
+<script>
+    // ⚠️ REPLACE THIS LINK WITH YOUR PUBLISHED CSV LINK FROM GOOGLE SHEETS
+    const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQkCTgB5LCfk3aJHdxykhizZSCu3K4fV1jC1HVWZEm6Q9n54r293loPq8Rp4xnAlcRxQ85nbkGcHOSD/pub?gid=0&single=true&output=csv";
+
+    let guestList = {};
+
+    // Fetch and parse the CSV from Google Sheets
+    async function fetchGuestList() {
+        const statusMessage = document.getElementById("statusMessage");
+        const nameInput = document.getElementById("guestName");
+        const searchBtn = document.getElementById("searchBtn");
+
+        try {
+            const response = await fetch(csvUrl);
+            if (!response.ok) throw new Error("Failed to fetch data");
+            
+            const data = await response.text();
+            
+            // Basic CSV parsing logic
+            const lines = data.split("\n");
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                // Split by comma, handling potential quotes if people use commas in fields
+                const columns = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                
+                if (columns.length >= 2) {
+                    const name = columns[0].replace(/"/g, "").trim().toLowerCase();
+                    const table = columns[1].replace(/"/g, "").trim();
+                    if (name) {
+                        guestList[name] = table;
+                    }
+                }
+            }
+
+            // Enable inputs once data is ready
+            statusMessage.innerText = "Please enter your name to find your table";
+            nameInput.disabled = false;
+            searchBtn.disabled = false;
+
+        } catch (error) {
+            console.error(error);
+            statusMessage.innerText = "Error loading guest list. Please see the coordinator.";
+            statusMessage.style.color = "#9b1c1c";
+        }
+    }
+
+    function findSeat() {
+        const input = document.getElementById("guestName").value.trim().toLowerCase();
+        const resultBox = document.getElementById("resultBox");
+
+        if (input === "") {
+            resultBox.className = "result error";
+            resultBox.innerHTML = "Please enter your name.";
+            resultBox.style.display = "block";
+            return;
+        }
+
+        let foundTable = null;
+        let matchedName = "";
+
+        // Search the dynamically loaded list
+        for (let guest in guestList) {
+            if (guest.includes(input) || input.includes(guest)) {
+                foundTable = guestList[guest];
+                matchedName = guest.replace(/\b\w/g, char => char.toUpperCase());
+                break;
+            }
+        }
+
+        if (foundTable) {
+            resultBox.className = "result success";
+            resultBox.innerHTML = `
+                <div>Hi <strong>${matchedName}</strong>, you are at</div>
+                <div class="table-number">${foundTable}</div>
+                <div>Enjoy the evening!</div>
+            `;
+        } else {
+            resultBox.className = "result error";
+            resultBox.innerHTML = "Name not found. Please try checking the spelling or see our coordinator near the entrance.";
+        }
+
+        resultBox.style.display = "block";
+    }
+
+    // Handle Enter Key
+    document.getElementById("guestName").addEventListener("keypress", function(event) {
+        if (event.key === "Enter" && !this.disabled) {
+            findSeat();
+        }
+    });
+
+    // Load data when the page loads
+    window.onload = fetchGuestList;
+</script>
+
+</body>
+</html>
